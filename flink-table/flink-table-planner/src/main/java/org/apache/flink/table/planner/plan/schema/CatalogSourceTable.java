@@ -85,8 +85,7 @@ public final class CatalogSourceTable extends FlinkPreparingTableBase {
 
         // Statistics are unknown for anonymous tables
         // Look at DatabaseCalciteSchema#getStatistic for more details
-        FlinkStatistic flinkStatistic =
-                FlinkStatistic.unknown(contextResolvedTable.getResolvedSchema()).build();
+        FlinkStatistic flinkStatistic = FlinkStatistic.unknown().build();
 
         CatalogSchemaTable catalogSchemaTable =
                 new CatalogSchemaTable(contextResolvedTable, flinkStatistic, !isBatchMode);

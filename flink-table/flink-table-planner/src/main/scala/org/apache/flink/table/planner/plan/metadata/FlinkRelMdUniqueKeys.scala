@@ -17,100 +17,34 @@
  */
 package org.apache.flink.table.planner.plan.metadata
 
-import org.apache.flink.table.catalog.{CatalogTable, ResolvedCatalogBaseTable}
+import com.google.common.collect.ImmutableSet
+import org.apache.calcite.plan.hep.HepRelVertex
+import org.apache.calcite.plan.volcano.RelSubset
+import org.apache.calcite.rel.`type`.{RelDataType, RelDataTypeFactory}
+import org.apache.calcite.rel.core._
+import org.apache.calcite.rel.metadata._
+import org.apache.calcite.rel.{RelNode, SingleRel}
+import org.apache.calcite.rex.{RexCall, RexInputRef, RexNode}
+import org.apache.calcite.sql.SqlKind
+import org.apache.calcite.sql.fun.SqlStdOperatorTable
+import org.apache.calcite.util.{Bug, BuiltInMethod, ImmutableBitSet, Util}
 import org.apache.flink.table.planner._
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory
 import org.apache.flink.table.planner.plan.nodes.calcite.{Expand, Rank, WatermarkAssigner, WindowAggregate}
 import org.apache.flink.table.planner.plan.nodes.physical.batch._
 import org.apache.flink.table.planner.plan.nodes.physical.common.CommonPhysicalLookupJoin
 import org.apache.flink.table.planner.plan.nodes.physical.stream._
-import org.apache.flink.table.planner.plan.schema.{FlinkPreparingTableBase, TableSourceTable}
 import org.apache.flink.table.planner.plan.utils.{FlinkRelMdUtil, RankUtil}
 import org.apache.flink.table.runtime.groupwindow.NamedWindowProperty
 import org.apache.flink.table.runtime.operators.rank.{ConstantRankRange, RankType}
 import org.apache.flink.table.types.logical.utils.LogicalTypeCasts
 
-import com.google.common.collect.ImmutableSet
-import org.apache.calcite.plan.RelOptTable
-import org.apache.calcite.plan.hep.HepRelVertex
-import org.apache.calcite.plan.volcano.RelSubset
-import org.apache.calcite.rel.`type`.{RelDataType, RelDataTypeFactory}
-import org.apache.calcite.rel.{RelNode, SingleRel}
-import org.apache.calcite.rel.core._
-import org.apache.calcite.rel.metadata._
-import org.apache.calcite.rex.{RexCall, RexInputRef, RexNode}
-import org.apache.calcite.sql.SqlKind
-import org.apache.calcite.sql.fun.SqlStdOperatorTable
-import org.apache.calcite.util.{Bug, BuiltInMethod, ImmutableBitSet, Util}
-
 import java.util
-
 import scala.collection.JavaConversions._
 
 class FlinkRelMdUniqueKeys private extends MetadataHandler[BuiltInMetadata.UniqueKeys] {
 
   def getDef: MetadataDef[BuiltInMetadata.UniqueKeys] = BuiltInMetadata.UniqueKeys.DEF
-
-  def getUniqueKeys(
-      rel: TableScan,
-      mq: RelMetadataQuery,
-      ignoreNulls: Boolean): JSet[ImmutableBitSet] = {
-    getTableUniqueKeys(rel.getTable)
-  }
-
-  private def getTableUniqueKeys(relOptTable: RelOptTable): JSet[ImmutableBitSet] = {
-    relOptTable match {
-      case sourceTable: TableSourceTable =>
-        val catalogTable =
-          sourceTable.contextResolvedTable.getResolvedTable[ResolvedCatalogBaseTable[_]]
-        catalogTable match {
-          case act: CatalogTable =>
-            val builder = ImmutableSet.builder[ImmutableBitSet]()
-
-            val schema = act.getResolvedSchema
-            if (schema.getPrimaryKey.isPresent) {
-              // use relOptTable's type which may be projected based on original schema
-              val columns = relOptTable.getRowType.getFieldNames
-              val primaryKeyColumns = schema.getPrimaryKey.get().getColumns
-              // we check this because a portion of a composite primary key is not unique
-              if (columns.containsAll(primaryKeyColumns)) {
-                val columnIndices = primaryKeyColumns.map(c => columns.indexOf(c))
-                builder.add(ImmutableBitSet.of(columnIndices: _*))
-              }
-            }
-
-            val uniqueSet = sourceTable.uniqueKeysSet.orElse(null)
-            if (uniqueSet != null) {
-              builder.addAll(uniqueSet)
-            }
-
-            val result = builder.build()
-            if (result.isEmpty) null else result
-        }
-      case table: FlinkPreparingTableBase => table.uniqueKeysSet.orElse(null)
-      case _ => null
-    }
-  }
-
-  def getUniqueKeys(
-      rel: Project,
-      mq: RelMetadataQuery,
-      ignoreNulls: Boolean): JSet[ImmutableBitSet] =
-    getProjectUniqueKeys(rel.getProjects, rel.getInput, mq, ignoreNulls)
-
-  def getUniqueKeys(
-      rel: Filter,
-      mq: RelMetadataQuery,
-      ignoreNulls: Boolean): JSet[ImmutableBitSet] = mq.getUniqueKeys(rel.getInput, ignoreNulls)
-
-  def getUniqueKeys(
-      calc: Calc,
-      mq: RelMetadataQuery,
-      ignoreNulls: Boolean): JSet[ImmutableBitSet] = {
-    val input = calc.getInput
-    val projects = calc.getProgram.getProjectList.map(calc.getProgram.expandLocalRef)
-    getProjectUniqueKeys(projects, input, mq, ignoreNulls)
-  }
 
   private def getProjectUniqueKeys(
       projects: JList[RexNode],

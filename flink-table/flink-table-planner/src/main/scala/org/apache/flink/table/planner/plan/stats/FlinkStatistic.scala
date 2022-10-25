@@ -17,34 +17,23 @@
  */
 package org.apache.flink.table.planner.plan.stats
 
-import org.apache.flink.table.catalog.{ContextResolvedTable, ResolvedSchema, UniqueConstraint}
-import org.apache.flink.table.plan.stats.{ColumnStats, TableStats}
-import org.apache.flink.table.planner.plan.`trait`.{RelModifiedMonotonicity, RelWindowProperties}
-
 import com.google.common.collect.ImmutableList
 import org.apache.calcite.rel.{RelCollation, RelDistribution, RelReferentialConstraint}
 import org.apache.calcite.schema.Statistic
 import org.apache.calcite.util.ImmutableBitSet
-
-import javax.annotation.Nullable
+import org.apache.flink.table.plan.stats.{ColumnStats, TableStats}
+import org.apache.flink.table.planner.plan.`trait`.{RelModifiedMonotonicity, RelWindowProperties}
 
 import java.util
-import java.util.{HashSet, Optional, Set}
-
-import scala.collection.JavaConversions._
 
 /** The class provides statistics for a [[org.apache.calcite.schema.Table]]. */
 class FlinkStatistic(
     tableStats: TableStats,
-    uniqueKeys: util.Set[_ <: util.Set[String]] = null,
     relModifiedMonotonicity: RelModifiedMonotonicity = null,
     relWindowProperties: RelWindowProperties = null)
   extends Statistic {
 
   require(tableStats != null, "tableStats should not be null")
-  require(
-    uniqueKeys == null || !uniqueKeys.exists(keys => keys == null || keys.isEmpty),
-    "uniqueKeys contains invalid elements!")
 
   /**
    * Returns the table statistics.
@@ -69,12 +58,6 @@ class FlinkStatistic(
       null
     }
   }
-
-  /**
-   * Returns the table uniqueKeys.
-   * @return
-   */
-  def getUniqueKeys: util.Set[_ <: util.Set[String]] = uniqueKeys
 
   /** Returns the modified monotonicity of the table */
   def getRelModifiedMonotonicity: RelModifiedMonotonicity = relModifiedMonotonicity
@@ -132,9 +115,6 @@ class FlinkStatistic(
           s"{rowCount: ${tableStats.getRowCount}, " +
           s"columnStats: ${tableStats.getColumnStats}}, ")
     }
-    if (uniqueKeys != null) {
-      builder.append(s"uniqueKeys: $uniqueKeys, ")
-    }
     if (relModifiedMonotonicity != null) {
       builder.append(relModifiedMonotonicity.toString).append(", ")
     }
@@ -161,7 +141,6 @@ object FlinkStatistic {
   class Builder {
 
     private var tableStats: TableStats = TableStats.UNKNOWN
-    private var uniqueKeys: util.Set[_ <: util.Set[String]] = _
     private var relModifiedMonotonicity: RelModifiedMonotonicity = _
     private var windowProperties: RelWindowProperties = _
 
@@ -172,23 +151,6 @@ object FlinkStatistic {
         this.tableStats = TableStats.UNKNOWN
       }
       this
-    }
-
-    def uniqueKeys(@Nullable uniqueKeys: util.Set[_ <: util.Set[String]]): Builder = {
-      this.uniqueKeys = uniqueKeys
-      this
-    }
-
-    def uniqueKeys(@Nullable uniqueConstraint: UniqueConstraint): Builder = {
-      val uniqueKeySet = if (uniqueConstraint == null) {
-        null
-      } else {
-        val uniqueKey = new util.HashSet[String](uniqueConstraint.getColumns)
-        val uniqueKeySet = new util.HashSet[util.Set[String]]
-        uniqueKeySet.add(uniqueKey)
-        uniqueKeySet
-      }
-      uniqueKeys(uniqueKeySet)
     }
 
     def relModifiedMonotonicity(monotonicity: RelModifiedMonotonicity): Builder = {
@@ -204,7 +166,6 @@ object FlinkStatistic {
     def statistic(statistic: FlinkStatistic): Builder = {
       require(statistic != null, "input statistic cannot be null!")
       this.tableStats = statistic.getTableStats
-      this.uniqueKeys = statistic.getUniqueKeys
       this.relModifiedMonotonicity = statistic.getRelModifiedMonotonicity
       this
     }
@@ -212,13 +173,12 @@ object FlinkStatistic {
     def build(): FlinkStatistic = {
       if (
         tableStats == TableStats.UNKNOWN &&
-        uniqueKeys == null &&
         relModifiedMonotonicity == null &&
         windowProperties == null
       ) {
         UNKNOWN
       } else {
-        new FlinkStatistic(tableStats, uniqueKeys, relModifiedMonotonicity)
+        new FlinkStatistic(tableStats, relModifiedMonotonicity)
       }
     }
   }
@@ -231,8 +191,7 @@ object FlinkStatistic {
    */
   def builder(): Builder = new Builder
 
-  def unknown(resolvedSchema: ResolvedSchema): Builder =
+  def unknown(): Builder =
     // this is a temporary solution, FLINK-15123 will resolve this
     new Builder()
-      .uniqueKeys(resolvedSchema.getPrimaryKey.orElse(null))
 }

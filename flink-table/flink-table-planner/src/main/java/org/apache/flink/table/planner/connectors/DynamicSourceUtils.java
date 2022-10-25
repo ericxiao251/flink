@@ -91,8 +91,7 @@ public final class DynamicSourceUtils {
                         physicalDataType,
                         isTopLevelRecord,
                         changelogMode);
-        final FlinkStatistic statistic =
-                FlinkStatistic.unknown(contextResolvedTable.getResolvedSchema()).build();
+        final FlinkStatistic statistic = FlinkStatistic.unknown().build();
         return convertSourceToRel(
                 isBatchMode,
                 config,

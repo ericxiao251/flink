@@ -17,16 +17,18 @@
  */
 package org.apache.flink.table.planner.plan.optimize
 
+import org.apache.calcite.rel.RelNode
+import org.apache.calcite.rel.core.TableScan
 import org.apache.flink.table.api.TableConfig
 import org.apache.flink.table.api.config.ExecutionConfigOptions
 import org.apache.flink.table.catalog.{CatalogManager, FunctionCatalog}
 import org.apache.flink.table.module.ModuleManager
 import org.apache.flink.table.planner.calcite.{FlinkRelBuilder, RexFactory}
 import org.apache.flink.table.planner.delegation.StreamPlanner
-import org.apache.flink.table.planner.plan.`trait`.{MiniBatchInterval, MiniBatchIntervalTrait, MiniBatchIntervalTraitDef, MiniBatchMode, ModifyKindSet, ModifyKindSetTraitDef, UpdateKind, UpdateKindTraitDef}
+import org.apache.flink.table.planner.plan.`trait`._
 import org.apache.flink.table.planner.plan.metadata.FlinkRelMetadataQuery
 import org.apache.flink.table.planner.plan.nodes.calcite.{LegacySink, Sink}
-import org.apache.flink.table.planner.plan.nodes.physical.stream.{StreamPhysicalDataStreamScan, StreamPhysicalIntermediateTableScan, StreamPhysicalLegacyTableSourceScan, StreamPhysicalRel, StreamPhysicalTableSourceScan}
+import org.apache.flink.table.planner.plan.nodes.physical.stream._
 import org.apache.flink.table.planner.plan.optimize.program.{FlinkStreamProgram, StreamOptimizeContext}
 import org.apache.flink.table.planner.plan.schema.IntermediateRelTable
 import org.apache.flink.table.planner.plan.stats.FlinkStatistic
@@ -34,12 +36,8 @@ import org.apache.flink.table.planner.utils.ShortcutUtils.unwrapContext
 import org.apache.flink.table.planner.utils.TableConfigUtils
 import org.apache.flink.util.Preconditions
 
-import org.apache.calcite.rel.RelNode
-import org.apache.calcite.rel.core.TableScan
-
 import java.util
 import java.util.Collections
-
 import scala.collection.JavaConversions._
 
 /** A [[CommonSubGraphBasedOptimizer]] for Stream. */
@@ -287,7 +285,6 @@ class StreamCommonSubGraphBasedOptimizer(planner: StreamPlanner)
     val windowProperties = fmq.getRelWindowProperties(relNode)
     val statistic = FlinkStatistic
       .builder()
-      .uniqueKeys(uniqueKeys)
       .relModifiedMonotonicity(monotonicity)
       .relWindowProperties(windowProperties)
       .build()

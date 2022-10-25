@@ -24,7 +24,6 @@ import org.apache.flink.table.sources.TableSource;
 
 import org.apache.flink.shaded.guava30.com.google.common.base.Strings;
 import org.apache.flink.shaded.guava30.com.google.common.collect.ImmutableList;
-import org.apache.flink.shaded.guava30.com.google.common.collect.ImmutableSet;
 
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.plan.RelOptSchema;
@@ -48,9 +47,6 @@ import javax.annotation.Nullable;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * A Flink {@link org.apache.calcite.prepare.Prepare.AbstractPreparingTable} implementation for the
@@ -261,32 +257,5 @@ public abstract class FlinkPreparingTableBase extends Prepare.AbstractPreparingT
     @Override
     public List<ImmutableBitSet> getKeys() {
         return statistic.getKeys();
-    }
-
-    /** Returns unique keySets of current table. */
-    public Optional<Set<ImmutableBitSet>> uniqueKeysSet() {
-        Set<? extends Set<String>> uniqueKeys = statistic.getUniqueKeys();
-        if (uniqueKeys == null) {
-            return Optional.empty();
-        } else if (uniqueKeys.size() == 0) {
-            return Optional.of(ImmutableSet.of());
-        } else {
-            ImmutableSet.Builder<ImmutableBitSet> uniqueKeysSetBuilder = ImmutableSet.builder();
-            for (Set<String> keys : uniqueKeys) {
-                // some columns in original uniqueKeys may not exist in RowType after project push
-                // down.
-                boolean allUniqueKeysExists =
-                        keys.stream().allMatch(f -> rowType.getField(f, false, false) != null);
-                // if not all columns in original uniqueKey, skip this uniqueKey
-                if (allUniqueKeysExists) {
-                    Set<Integer> keysPosition =
-                            keys.stream()
-                                    .map(f -> rowType.getField(f, false, false).getIndex())
-                                    .collect(Collectors.toSet());
-                    uniqueKeysSetBuilder.add(ImmutableBitSet.of(keysPosition));
-                }
-            }
-            return Optional.of(uniqueKeysSetBuilder.build());
-        }
     }
 }

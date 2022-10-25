@@ -86,7 +86,7 @@ class DatabaseCalciteSchema extends FlinkSchema {
                 contextResolvedTable.getResolvedTable();
         switch (resolvedBaseTable.getTableKind()) {
             case TABLE:
-                return FlinkStatistic.unknown(resolvedBaseTable.getResolvedSchema())
+                return FlinkStatistic.unknown()
                         .tableStats(extractTableStats(contextResolvedTable, identifier))
                         .build();
             case VIEW:
